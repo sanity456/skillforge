@@ -50,7 +50,13 @@ def opened(contract):
 
 
 def test_protocol_rejects_funds(contract):
-    assert contract.get_protocol() == {"protocol": "skillforge-v1", "funds_accepted": False, "score_max": 100, "criteria_count": 4, "max_work_bytes": 5000}
+    protocol = contract.get_protocol()
+    assert protocol["protocol"] == "skillforge-v1"
+    assert protocol["owner"] == str(contract.owner).lower()
+    assert protocol["funds_accepted"] is False
+    assert protocol["score_max"] == 100
+    assert protocol["criteria_count"] == 4
+    assert protocol["max_work_bytes"] == 5000
 
 
 def test_owner_creates_locked_draft(contract):
@@ -61,6 +67,14 @@ def test_owner_creates_locked_draft(contract):
     assert len(challenge["rubric_hash"]) == 64
     with pytest.raises(Exception, match="CHALLENGE_EXISTS"):
         create(contract)
+
+
+def test_normal_line_breaks_are_allowed_in_public_text(contract):
+    challenge = contract.create_challenge(
+        "multiline-brief", "Multiline brief", "Testing", "First line.\nSecond line.",
+        "Criterion one.", "Criterion two.", "Criterion three.", "Criterion four.", 70, 2, True,
+    )
+    assert challenge["brief"] == "First line.\nSecond line."
 
 
 def test_non_owner_cannot_create_or_publish(contract, direct_vm, direct_alice, direct_bob):
@@ -85,13 +99,15 @@ def test_publish_and_close_lifecycle(opened, direct_vm):
 def test_passing_submission_issues_credential(opened, direct_vm, direct_bob):
     direct_vm.sender = direct_bob
     mock(direct_vm, score(82))
-    result = opened.submit_work("support-clarity-v1", "A thoughtful public response.", "attempt-one", True)
+    result = opened.submit_work("support-clarity-v1", "A thoughtful public\nresponse.", "attempt-one", True)
     assert result["verdict"] == "CREDENTIAL_EARNED"
     assert result["reason_code"] == "PASSED_THRESHOLD"
     assert result["assessment"]["total"] == 82
     profile = opened.get_profile(str(direct_bob))
     assert profile["credentials"][0]["score"] == 82
     assert profile["attempts"] == [{"challenge_id": "support-clarity-v1", "attempts": 1}]
+    assert profile["submissions"][0]["id"] == result["id"]
+    assert "work" not in profile["submissions"][0]
 
 
 def test_failed_attempt_has_reason_and_no_credential(opened, direct_vm, direct_bob):
@@ -130,6 +146,19 @@ def test_attempt_limit_is_enforced(opened, direct_vm, direct_bob):
         opened.submit_work("support-clarity-v1", "Attempt four.", "request-four", True)
 
 
+def test_last_failed_attempt_is_marked_exhausted(contract, direct_vm, direct_bob):
+    contract.create_challenge(
+        "single-attempt", "One attempt", "Test", "Test brief.",
+        "Criterion one.", "Criterion two.", "Criterion three.", "Criterion four.", 70, 1, True,
+    )
+    contract.publish_challenge("single-attempt")
+    direct_vm.sender = direct_bob
+    mock(direct_vm, score(55))
+    result = contract.submit_work("single-attempt", "A concise but incomplete answer.", "final-attempt", True)
+    assert result["verdict"] == "ATTEMPTS_EXHAUSTED"
+    assert result["attempts_remaining"] == 0
+
+
 @pytest.mark.parametrize("consent", [False, 1, "true", None])
 def test_public_consent_is_strict(opened, direct_vm, direct_bob, consent):
     direct_vm.sender = direct_bob
@@ -159,3 +188,26 @@ def test_closed_challenge_rejects_new_work(opened, direct_vm, direct_bob):
     mock(direct_vm)
     with pytest.raises(Exception, match="CHALLENGE_NOT_OPEN"):
         opened.submit_work("support-clarity-v1", "Public answer.", "request", True)
+
+
+def test_long_challenge_id_has_retrievable_submission(contract, direct_vm, direct_bob):
+    challenge_id = "a" * 64
+    contract.create_challenge(
+        challenge_id, "Long ID", "Test", "Test brief.",
+        "Criterion one.", "Criterion two.", "Criterion three.", "Criterion four.", 70, 1, True,
+    )
+    contract.publish_challenge(challenge_id)
+    direct_vm.sender = direct_bob
+    mock(direct_vm, score(80))
+    result = contract.submit_work(challenge_id, "A complete answer for the test.", "long-id-test", True)
+    assert result["id"] == "submission-1"
+    assert contract.get_submission(result["id"]) == result
+
+
+def test_invalid_model_prose_is_classified_as_model_error(opened, direct_vm, direct_bob):
+    direct_vm.sender = direct_bob
+    invalid = score(80)
+    invalid["summary"] = ""
+    mock(direct_vm, invalid)
+    with pytest.raises(Exception, match="LLM_ERROR.*INVALID_TEXT"):
+        opened.submit_work("support-clarity-v1", "A sufficiently complete public answer.", "invalid-prose", True)

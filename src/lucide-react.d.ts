@@ -19,3 +19,8 @@ declare module 'lucide-react' {
   export const Wallet: Icon;
   export const X: Icon;
 }
+
+declare module '*.py?raw' {
+  const source: string;
+  export default source;
+}

@@ -8,6 +8,8 @@ export type Challenge = {
   pass_mark: number;
   max_attempts: number;
   status: 'DRAFT' | 'OPEN' | 'CLOSED';
+  rubric_hash?: string;
+  creator?: string;
   difficulty: 'Starter' | 'Intermediate' | 'Advanced';
   time: string;
   accent: string;

@@ -53,6 +53,19 @@ jobs:
         run: genvm-lint check contracts/skillforge.py --json
       - name: Run complete direct contract suite
         run: python -m pytest tests/direct -q
+      - name: Start isolated GenLayer simulator
+        run: |
+          nohup glsim --host 127.0.0.1 --port 4000 --validators 3 --no-browser >/tmp/skillforge-glsim.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:4000/openapi.json >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/skillforge-glsim.log
+          exit 1
+      - name: Run local consensus lifecycle test
+        env:
+          RUN_SKILLFORGE_INTEGRATION: '1'
+        run: gltest tests/integration/test_lifecycle.py -v -s --network localnet
       - name: Run frontend tests
         run: npm test
       - name: Build production assets

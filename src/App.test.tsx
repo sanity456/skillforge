@@ -20,4 +20,19 @@ describe('SkillForge shell', () => {
     expect(page.getByRole('heading', { name: 'My proof' })).toBeTruthy();
     expect(page.getByText(/your work deserves a home/i)).toBeTruthy();
   });
+
+  it('clears the selected challenge when the user switches sections', async () => {
+    const page = render(<App />);
+    await userEvent.click(page.getByRole('button', { name: /take your first challenge/i }));
+    expect(page.getByRole('button', { name: /all challenges/i })).toBeTruthy();
+    await userEvent.click(page.getByRole('button', { name: /my proof/i }));
+    expect(page.getByRole('heading', { name: 'My proof' })).toBeTruthy();
+    expect(page.queryByRole('button', { name: /all challenges/i })).toBeNull();
+  });
+
+  it('labels catalog examples as previews until deployment exists', () => {
+    const page = render(<App />);
+    expect(page.getByText(/preview challenges/i)).toBeTruthy();
+    expect(page.getByText(/become active after skillforge is deployed/i)).toBeTruthy();
+  });
 });

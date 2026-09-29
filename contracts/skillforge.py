@@ -57,8 +57,20 @@ def _text(value: str, maximum: int) -> str:
     value = value.strip()
     if not value or len(value.encode("utf-8")) > maximum:
         _fail("TEXT_LIMIT")
-    if re.search(r"[\x00-\x1f\x7f]", value):
+    if re.search(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", value):
         _fail("CONTROL_CHARACTERS")
+    return value
+
+
+def _model_text(value, maximum: int) -> str:
+    """Validate generated prose without turning model errors into business errors."""
+    if not isinstance(value, str):
+        _model_fail("INVALID_TEXT")
+    value = value.strip()
+    if not value or len(value.encode("utf-8")) > maximum:
+        _model_fail("INVALID_TEXT")
+    if re.search(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", value):
+        _model_fail("INVALID_TEXT")
     return value
 
 
@@ -88,15 +100,32 @@ def _assessment(raw, pass_mark: int) -> dict:
     output = {
         "scores": clean_scores,
         "critical_failure": raw["critical_failure"],
-        "summary": _text(raw["summary"], 800),
-        "strength": _text(raw["strength"], 300),
-        "improvement": _text(raw["improvement"], 300),
+        "summary": _model_text(raw["summary"], 800),
+        "strength": _model_text(raw["strength"], 300),
+        "improvement": _model_text(raw["improvement"], 300),
     }
     output["total"] = sum(clean_scores.values())
     output["passed"] = output["total"] >= pass_mark and not output["critical_failure"]
     if derived.issubset(raw) and (raw["total"] != output["total"] or raw["passed"] != output["passed"]):
         _model_fail("INVALID_DERIVED_RESULT")
     return output
+
+
+def _profile_submission(record: dict) -> dict:
+    return {
+        "id": record["id"],
+        "challenge_id": record["challenge_id"],
+        "title": record["title"],
+        "category": record["category"],
+        "attempt": record["attempt"],
+        "attempts_remaining": record["attempts_remaining"],
+        "assessment": record["assessment"],
+        "verdict": record["verdict"],
+        "reason_code": record["reason_code"],
+        "recorded_at": record["recorded_at"],
+        "rubric_hash": record["rubric_hash"],
+        "work_hash": record["work_hash"],
+    }
 
 
 def _evaluate(challenge: dict, work: str) -> dict:
@@ -164,6 +193,8 @@ class SkillForge(gl.Contract):
     attempts: TreeMap[str, u256]
     credentials: TreeMap[str, str]
     requests: TreeMap[str, str]
+    wallet_submission_counts: TreeMap[str, u256]
+    wallet_submission_ids: TreeMap[str, str]
 
     def __init__(self):
         _no_value()
@@ -182,7 +213,7 @@ class SkillForge(gl.Contract):
 
     @gl.public.view
     def get_protocol(self) -> dict:
-        return {"protocol": PROTOCOL, "funds_accepted": False, "score_max": 100, "criteria_count": 4, "max_work_bytes": 5000}
+        return {"protocol": PROTOCOL, "owner": str(self.owner).lower(), "funds_accepted": False, "score_max": 100, "criteria_count": 4, "max_work_bytes": 5000}
 
     @gl.public.view
     def get_challenge(self, challenge_id: str) -> dict:
@@ -214,7 +245,13 @@ class SkillForge(gl.Contract):
                 attempts.append({"challenge_id": challenge_id, "attempts": count})
             if key in self.credentials:
                 earned.append(json.loads(self.credentials[key]))
-        return {"wallet": wallet, "credentials": earned, "attempts": attempts}
+        count = int(self.wallet_submission_counts.get(wallet, 0))
+        first = max(1, count - 24)
+        submissions = [
+            _profile_submission(json.loads(self.submissions[self.wallet_submission_ids[wallet + ":" + str(index)]]))
+            for index in range(first, count + 1)
+        ]
+        return {"wallet": wallet, "credentials": earned, "attempts": attempts, "submissions": submissions, "submission_count": count}
 
     @gl.public.write
     def create_challenge(self, challenge_id: str, title: str, category: str, brief: str, criterion_1: str, criterion_2: str, criterion_3: str, criterion_4: str, pass_mark: int, max_attempts: int, public_consent: bool) -> dict:
@@ -294,19 +331,24 @@ class SkillForge(gl.Contract):
         if attempt > challenge["max_attempts"]:
             _fail("ATTEMPT_LIMIT_REACHED")
         assessment = _evaluate(challenge, work)
-        submission_id = challenge_id + "-" + str(len(self.submission_ids) + 1)
+        # Keep generated IDs valid even when the challenge ID is at its 64-char limit.
+        submission_id = "submission-" + str(len(self.submission_ids) + 1)
         reason_code = "PASSED_THRESHOLD" if assessment["passed"] else ("CRITICAL_REQUIREMENT_MISSED" if assessment["critical_failure"] else "BELOW_THRESHOLD")
+        remaining_attempts = challenge["max_attempts"] - attempt
         record = {
             "id": submission_id,
             "challenge_id": challenge_id,
+            "title": challenge["title"],
+            "category": challenge["category"],
             "challenge_version": challenge["version"],
             "rubric_hash": challenge["rubric_hash"],
             "wallet": _sender(),
             "attempt": attempt,
+            "attempts_remaining": remaining_attempts,
             "work": work,
             "work_hash": _hash(work),
             "assessment": assessment,
-            "verdict": "CREDENTIAL_EARNED" if assessment["passed"] else "RETRY_AVAILABLE",
+            "verdict": "CREDENTIAL_EARNED" if assessment["passed"] else ("RETRY_AVAILABLE" if remaining_attempts > 0 else "ATTEMPTS_EXHAUSTED"),
             "reason_code": reason_code,
             "recorded_at": _now(),
         }
@@ -314,6 +356,9 @@ class SkillForge(gl.Contract):
         self.submission_ids.append(submission_id)
         self.attempts[attempt_key] = u256(attempt)
         self.requests[request_key] = _json({"digest": digest, "submission_id": submission_id})
+        wallet_submission_count = int(self.wallet_submission_counts.get(_sender(), 0)) + 1
+        self.wallet_submission_ids[_sender() + ":" + str(wallet_submission_count)] = submission_id
+        self.wallet_submission_counts[_sender()] = u256(wallet_submission_count)
         if assessment["passed"]:
             credential = {
                 "id": challenge_id + ":" + _sender(),
