@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
+
+:root { color-scheme: dark; font-family: 'DM Sans', sans-serif; color: #f5f2e9; background: #090d18; font-synthesis: none; --ink:#f5f2e9; --muted:#9ca6bb; --line:rgba(255,255,255,.1); --panel:#111727; --lime:#b7f36b; --orange:#ff8f5c; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin:0; min-width:320px; min-height:100vh; background:radial-gradient(circle at 80% 5%,rgba(95,75,180,.18),transparent 27rem),#090d18; }
+button,textarea { font:inherit; }
+button,a { -webkit-tap-highlight-color:transparent; }
+button:focus-visible,a:focus-visible,textarea:focus-visible,input:focus-visible { outline:3px solid #b7f36b; outline-offset:3px; }
+header { height:78px; display:flex; align-items:center; gap:28px; padding:0 max(24px,calc((100vw - 1240px)/2)); border-bottom:1px solid var(--line); background:rgba(9,13,24,.82); backdrop-filter:blur(18px); position:sticky; top:0; z-index:20; }
+.logo-button { padding:0; border:0; background:none; color:inherit; cursor:pointer; }
+.brand { display:flex; align-items:center; gap:11px; font:800 21px 'Manrope'; white-space:nowrap; }
+.brand>span:last-child>span { color:var(--lime); }
+.brand-mark { width:40px;height:40px;display:grid;place-items:center;border-radius:12px;color:#08100b;background:var(--lime);transform:rotate(-4deg);box-shadow:0 8px 28px rgba(183,243,107,.15); }
+nav { display:flex; gap:4px; margin-left:20px; }
+nav button { display:flex;align-items:center;gap:7px;padding:10px 13px;border:0;border-radius:10px;background:transparent;color:var(--muted);cursor:pointer;font-weight:600; }
+nav button:hover,nav button.active { color:var(--ink);background:rgba(255,255,255,.065); }
+.network { margin-left:auto;color:var(--muted);font-size:13px;display:flex;align-items:center;gap:7px; }
+.network i { width:7px;height:7px;background:#67e8a1;border-radius:50%;box-shadow:0 0 0 4px rgba(103,232,161,.1); }
+.wallet-button { border:1px solid var(--line);color:var(--ink);background:#141b2c;border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700; }
+.wallet-button:hover { border-color:rgba(183,243,107,.5); }
+.hero { min-height:680px; max-width:1240px;margin:auto;padding:115px 32px 90px;position:relative;overflow:hidden; }
+.eyebrow,.kicker { color:var(--lime);text-transform:uppercase;letter-spacing:.16em;font-size:12px;font-weight:800;display:flex;align-items:center;gap:8px; }
+.hero h1 { margin:20px 0 24px;font:800 clamp(64px,9vw,118px)/.88 'Manrope';letter-spacing:-.07em;max-width:800px; }
+.hero h1 em { color:transparent;-webkit-text-stroke:1.5px var(--orange);font-style:normal; }
+.hero-copy { max-width:580px;font-size:20px;line-height:1.6;color:#b6bfd0; }
+.hero-actions { display:flex;align-items:center;gap:28px;margin-top:34px; }
+.primary,.secondary { min-height:48px;border-radius:12px;padding:0 19px;display:inline-flex;align-items:center;justify-content:center;gap:10px;font-weight:800;cursor:pointer;border:0; }
+.primary { background:var(--lime);color:#0a1208;box-shadow:0 12px 32px rgba(183,243,107,.12); }
+.primary:hover { background:#c9ff82;transform:translateY(-1px); }
+.primary:disabled { cursor:not-allowed;opacity:.46;transform:none; }
+.secondary { color:var(--ink);background:rgba(255,255,255,.07);border:1px solid var(--line); }
+.text-link { color:var(--ink);font-weight:700;text-decoration:none;border-bottom:1px solid #727b8c;padding-bottom:4px; }
+.hero-proof { display:flex;gap:28px;margin-top:70px;color:#8791a5;font-size:13px; }
+.hero-proof span { display:flex;align-items:center;gap:8px; }
+.hero-glyph { position:absolute;right:40px;top:128px;width:390px;height:390px;display:grid;place-items:center;opacity:.95; }
+.glyph-ring { position:absolute;border:1px solid rgba(183,243,107,.25);border-radius:50%; }
+.ring-one { inset:42px;animation:spin 22s linear infinite;border-style:dashed; }
+.ring-two { inset:90px;border-color:rgba(255,143,92,.32); }
+.glyph-core { width:128px;height:128px;border:1px solid rgba(255,255,255,.17);display:grid;place-items:center;background:linear-gradient(145deg,#1f2940,#0b1020);transform:rotate(45deg);box-shadow:0 35px 90px rgba(0,0,0,.5); }
+.glyph-core svg { transform:rotate(-45deg);color:var(--lime); }
+.spark { position:absolute;color:var(--orange);font-size:24px; }.spark.one{right:28px;top:83px}.spark.two{left:42px;bottom:72px;color:var(--lime);font-size:16px}
+@keyframes spin { to { transform:rotate(360deg); } }
+.challenge-section { max-width:1240px;margin:auto;padding:110px 32px; }
+.section-heading { display:flex;justify-content:space-between;gap:48px;align-items:end;margin-bottom:42px; }
+.section-heading h2,.how h2,.subpage h1 { font:800 clamp(38px,5vw,62px)/1.03 'Manrope';letter-spacing:-.045em;margin:12px 0 0; }
+.section-heading>p { max-width:420px;color:var(--muted);line-height:1.65; }
+.challenge-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:18px; }
+.challenge-card { --accent:#b7f36b;min-height:505px;padding:26px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(165deg,rgba(255,255,255,.055),rgba(255,255,255,.015));position:relative;overflow:hidden;display:flex;flex-direction:column;transition:.25s ease; }
+.challenge-card:hover { transform:translateY(-5px);border-color:color-mix(in srgb,var(--accent) 55%,transparent); }
+.card-topline { display:flex;justify-content:space-between;color:var(--accent);text-transform:uppercase;letter-spacing:.13em;font-size:11px;font-weight:800; }
+.challenge-number { color:#6d768a; }
+.card-orbit { width:112px;height:112px;border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);border-radius:50%;display:grid;place-items:center;margin:40px 0 30px;position:relative; }
+.card-orbit:before,.card-orbit:after { content:'';position:absolute;width:9px;height:9px;border-radius:50%;background:var(--accent);top:6px;right:17px; }.card-orbit:after{top:auto;right:auto;bottom:7px;left:16px;width:4px;height:4px}
+.card-orbit span { font:800 32px 'Manrope';color:var(--accent); }
+.challenge-card h3 { font:800 27px/1.08 'Manrope';letter-spacing:-.035em;margin:0 0 14px; }
+.challenge-card>p { color:var(--muted);line-height:1.55;margin:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden; }
+.card-meta { display:flex;align-items:center;gap:9px;color:#7d879a;font-size:12px;margin-top:auto;padding:25px 0 18px; }.card-meta i{width:3px;height:3px;background:#5f687a;border-radius:50%}
+.card-action { border:0;border-top:1px solid var(--line);background:none;color:var(--ink);padding:17px 0 0;display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-weight:800; }
+.card-action svg { color:var(--accent); }
+.how { max-width:1176px;margin:20px auto 120px;border-radius:26px;padding:58px;background:#eef1e8;color:#101521;display:grid;grid-template-columns:.85fr 1.15fr;gap:70px; }
+.how .kicker { color:#53662f; }.how h2 { font-size:43px; }
+.how ol { padding:0;margin:0;list-style:none; }.how li{display:flex;gap:20px;padding:22px 0;border-bottom:1px solid rgba(15,20,32,.14)}.how li:last-child{border:0}.how li>span{width:34px;height:34px;display:grid;place-items:center;border:1px solid #aeb5a5;border-radius:50%;font-weight:800}.how b{font:800 18px 'Manrope'}.how p{margin:6px 0 0;color:#5c6572}
+footer { border-top:1px solid var(--line);max-width:1240px;margin:auto;padding:40px 32px 55px;display:flex;align-items:center;gap:30px;color:#70798b; }footer p{margin:auto}footer>span{font-size:12px}
+.error-banner { max-width:900px;margin:20px auto;padding:12px 16px;background:#3b1c23;border:1px solid #7d3342;border-radius:12px;display:flex;gap:9px;align-items:center; }
+.detail-shell,.subpage { max-width:1240px;margin:auto;padding:50px 32px 110px; }.back{border:0;background:none;color:var(--muted);display:flex;align-items:center;gap:5px;cursor:pointer;margin-bottom:34px}.back:hover{color:var(--ink)}
+.detail-grid { display:grid;grid-template-columns:1.02fr .98fr;gap:22px;align-items:start; }
+.brief-panel,.work-panel { border:1px solid var(--line);border-radius:22px;background:rgba(17,23,39,.83);padding:38px; }
+.detail-label { text-transform:uppercase;letter-spacing:.14em;font-size:11px;font-weight:800;color:var(--muted);display:flex;align-items:center;gap:9px; }.detail-label span{width:8px;height:8px;border-radius:50%}
+.brief-panel h1 { font:800 clamp(42px,5vw,67px)/.98 'Manrope';letter-spacing:-.055em;margin:22px 0; }.brief{font-size:18px;color:#bec5d1;line-height:1.65}.fact-row{display:flex;gap:10px;margin:28px 0 42px}.fact-row span{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:99px;padding:7px 11px;color:#aab3c4;font-size:12px}.brief-panel h2{font:800 18px 'Manrope';margin-bottom:18px}.criteria{list-style:none;padding:0;margin:0;display:grid;gap:12px}.criteria li{display:flex;gap:12px;color:#aeb7c7;line-height:1.45}.criteria li>span{flex:0 0 27px;height:27px;border-radius:8px;background:rgba(183,243,107,.1);color:var(--lime);display:grid;place-items:center;font-size:12px;font-weight:800}.rubric-lock{display:flex;gap:13px;background:#171e30;border:1px solid rgba(183,243,107,.18);padding:17px;border-radius:14px;margin-top:30px;color:var(--lime)}.rubric-lock div{color:var(--ink)}.rubric-lock p{margin:5px 0 0;color:var(--muted);font-size:13px;line-height:1.45}
+.work-panel{position:sticky;top:100px}.work-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;font-weight:800}.work-heading small{font-weight:500;color:#737e91}.work-panel textarea{width:100%;height:335px;resize:vertical;background:#0b101d;color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:18px;line-height:1.6}.work-panel textarea::placeholder{color:#596477}.consent{display:flex;gap:12px;margin:18px 0;cursor:pointer}.consent input{width:18px;height:18px;accent-color:var(--lime)}.consent span{display:grid;gap:4px}.consent small{color:var(--muted);line-height:1.4}.full{width:100%}.notice{background:#182139;border:1px solid #33425f;padding:12px 14px;border-radius:10px;color:#cbd4e3;font-size:13px}.transaction-note{display:flex;gap:9px;margin-top:18px;color:#7e899c;font-size:12px;line-height:1.45}
+.subpage>h1{margin-bottom:46px}.empty{min-height:390px;border:1px dashed rgba(255,255,255,.18);border-radius:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px}.empty-icon{width:72px;height:72px;border-radius:22px;background:rgba(183,243,107,.1);color:var(--lime);display:grid;place-items:center}.empty h2{font:800 28px 'Manrope';margin:20px 0 8px}.empty p{max-width:480px;color:var(--muted);line-height:1.6;margin:0 0 24px}.profile-grid{display:grid;grid-template-columns:.8fr 1.2fr;gap:20px}.profile-card{border-radius:22px;padding:38px;background:linear-gradient(145deg,#222c45,#131929);border:1px solid var(--line)}.avatar{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;background:var(--lime);color:#0b120a;margin-bottom:30px}.profile-card>span{color:var(--muted);font-size:13px}.profile-card h2{font:800 30px 'Manrope';margin:8px 0}.profile-card p{color:var(--muted);line-height:1.55}.empty.small{min-height:330px}
+.studio-intro{display:flex;align-items:center;justify-content:space-between;padding:32px;border:1px solid var(--line);background:linear-gradient(110deg,rgba(183,243,107,.07),transparent);border-radius:20px;margin-bottom:24px}.studio-intro h2{font:800 26px 'Manrope';margin:0 0 7px}.studio-intro p{color:var(--muted);margin:0}.studio-table{border:1px solid var(--line);border-radius:18px;overflow:hidden}.table-head,.table-row{display:grid;grid-template-columns:2fr .7fr .6fr .5fr;align-items:center;gap:20px;padding:17px 24px}.table-head{background:#101625;color:#758095;font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:800}.table-row{border-top:1px solid var(--line);min-height:78px}.table-row>span:first-child{display:grid;grid-template-columns:12px auto;column-gap:12px;align-items:center}.table-row i{width:8px;height:8px;border-radius:50%;grid-row:1/3}.table-row small{color:var(--muted)}.status{color:var(--lime);display:flex;align-items:center;gap:6px}.studio-connect{display:flex;align-items:center;gap:12px;margin-top:20px;background:#151c2d;padding:14px 18px;border-radius:13px;color:var(--muted)}.studio-connect button{margin-left:auto;border:0;background:none;color:var(--lime);font-weight:800;cursor:pointer}
+@media(max-width:900px){header{gap:12px;padding:0 18px}.network{display:none}nav button{font-size:0;padding:10px}nav button svg{width:20px;height:20px}.hero-glyph{opacity:.25;right:-140px}.challenge-grid{grid-template-columns:1fr}.challenge-card{min-height:420px}.detail-grid,.how,.profile-grid{grid-template-columns:1fr}.work-panel{position:static}.section-heading{align-items:start;flex-direction:column}.how{margin-inline:22px}.table-head,.table-row{grid-template-columns:1.7fr .7fr .6fr}.table-head span:last-child,.table-row>span:last-child{display:none}}
+@media(max-width:600px){header{height:68px}.brand>span:last-child{display:none}nav{margin-left:0}.wallet-button{font-size:0;padding:11px}.wallet-button svg{width:18px}.hero{padding:80px 22px 60px;min-height:620px}.hero h1{font-size:63px}.hero-copy{font-size:17px}.hero-actions{align-items:flex-start;flex-direction:column}.hero-proof{flex-direction:column;gap:12px}.challenge-section,.detail-shell,.subpage{padding-inline:18px}.brief-panel,.work-panel{padding:24px}.how{padding:35px 24px}.studio-intro{align-items:flex-start;flex-direction:column;gap:20px}.table-head,.table-row{grid-template-columns:1fr .5fr}.table-head span:nth-child(3),.table-row>span:nth-child(3){display:none}footer{flex-wrap:wrap}footer p{order:3;width:100%}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
