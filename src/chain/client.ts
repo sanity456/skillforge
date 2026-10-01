@@ -1,10 +1,12 @@
 import deployment from './deployment.json';
 import { waitForFinalizedTransaction, type TransactionProgress } from './transactions.ts';
+import type { createClient } from 'genlayer-js';
 
 export const CHAIN_ID = 61999;
 export const RPC = 'https://studio.genlayer.com/api';
 
 export type Address = `0x${string}`;
+type SkillForgeClient = ReturnType<typeof createClient>;
 type Provider = {
   request(request: { method: string; params?: unknown[] }): Promise<unknown>;
   on?(event: string, listener: (...args: unknown[]) => void): void;
@@ -12,15 +14,43 @@ type Provider = {
 };
 
 const DEPLOYMENT_STORAGE_KEY = 'skillforge.studionet.contract.v1';
+const PENDING_DEPLOYMENT_STORAGE_KEY = 'skillforge.studionet.pending-deployment.v1';
+
+export type PendingDeployment = { hash: `0x${string}`; owner: Address; chainId: number };
+
+export function getPendingDeployment(): PendingDeployment | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem(PENDING_DEPLOYMENT_STORAGE_KEY) ?? 'null');
+    if (!value || typeof value !== 'object') return null;
+    const attempt = value as Partial<PendingDeployment>;
+    if (
+      typeof attempt.hash !== 'string' || !/^0x[0-9a-f]{64}$/i.test(attempt.hash) ||
+      typeof attempt.owner !== 'string' || !/^0x[0-9a-f]{40}$/i.test(attempt.owner) ||
+      attempt.chainId !== CHAIN_ID
+    ) return null;
+    return { hash: attempt.hash as `0x${string}`, owner: attempt.owner.toLowerCase() as Address, chainId: CHAIN_ID };
+  } catch {
+    return null;
+  }
+}
+
+function savePendingDeployment(hash: string, owner: Address) {
+  window.localStorage.setItem(PENDING_DEPLOYMENT_STORAGE_KEY, JSON.stringify({ hash, owner, chainId: CHAIN_ID }));
+}
+
+function clearPendingDeployment() {
+  window.localStorage.removeItem(PENDING_DEPLOYMENT_STORAGE_KEY);
+}
 
 export function getDeploymentAddress(): Address | null {
   if (typeof window !== 'undefined') {
     const saved = window.localStorage.getItem(DEPLOYMENT_STORAGE_KEY);
-    if (saved && /^0x[0-9a-f]{40}$/i.test(saved)) return saved.toLowerCase() as Address;
+    if (saved && /^0x[0-9a-f]{40}$/i.test(saved)) return saved as Address;
   }
   const configuredAddress: unknown = deployment.address;
   return typeof configuredAddress === 'string' && /^0x[0-9a-f]{40}$/i.test(configuredAddress)
-    ? configuredAddress.toLowerCase() as Address
+    ? configuredAddress as Address
     : null;
 }
 
@@ -150,6 +180,8 @@ export async function deploySkillForge(
   onProgress?: (progress: TransactionProgress) => void,
 ) {
   if (getDeploymentAddress()) throw new Error('SkillForge already has a saved deployment.');
+  const pending = getPendingDeployment();
+  if (pending) throw new Error(`A deployment transaction is already recorded (${pending.hash}). Check that transaction before sending another.`);
   const p = provider();
   if (!p) throw new Error('Wallet provider not found.');
   const state = await walletState(p);
@@ -168,19 +200,56 @@ export async function deploySkillForge(
   });
   const hash = await client.deployContract({ code: contractCode, leaderOnly: false });
   const typedHash = hash as unknown as Parameters<typeof client.getTransaction>[0]['hash'];
+  savePendingDeployment(String(hash), account);
   onProgress?.({ hash: String(hash), status: 'SUBMITTED' });
+  const readClient = createClient({ chain: studionet, endpoint: RPC });
+  return verifySubmittedDeployment(client, readClient, typedHash, String(hash), account, onProgress);
+}
+
+export async function resumeSkillForgeDeployment(
+  account: Address,
+  onProgress?: (progress: TransactionProgress) => void,
+) {
+  const pending = getPendingDeployment();
+  if (!pending) throw new Error('There is no saved SkillForge deployment to check.');
+  if (pending.owner !== account) throw new Error(`This pending deployment belongs to ${pending.owner}. Reconnect that wallet to check it.`);
+  const p = provider();
+  if (!p) throw new Error('Wallet provider not found.');
+  const state = await walletState(p);
+  if (state.account !== account) throw new Error('The active wallet changed. Reconnect the wallet that sent the saved deployment.');
+  if (state.chainId !== CHAIN_ID) throw new Error('Switch your wallet to GenLayer Studionet before checking the saved deployment.');
+  const [{ createClient }, { studionet }] = await Promise.all([
+    import('genlayer-js'),
+    import('genlayer-js/chains'),
+  ]);
+  const client = createClient({ chain: studionet, endpoint: RPC });
+  const typedHash = pending.hash as unknown as Parameters<typeof client.getTransaction>[0]['hash'];
+  return verifySubmittedDeployment(client, client, typedHash, pending.hash, account, onProgress);
+}
+
+async function verifySubmittedDeployment(
+  client: SkillForgeClient,
+  readClient: SkillForgeClient,
+  typedHash: Parameters<SkillForgeClient['getTransaction']>[0]['hash'],
+  hash: string,
+  account: Address,
+  onProgress?: (progress: TransactionProgress) => void,
+) {
   const receipt = await waitForFinalizedTransaction(
-    String(hash),
+    hash,
     () => client.getTransaction({ hash: typedHash }),
     onProgress,
   );
   const receiptData = (receipt as { data?: { contract_address?: unknown } }).data;
   const address = receiptData?.contract_address;
   if (typeof address !== 'string' || !/^0x[0-9a-f]{40}$/i.test(address)) {
-    throw new Error(`Deployment finalized but the contract address was missing from its receipt. Transaction: ${String(hash)}`);
+    clearPendingDeployment();
+    throw new Error(`Transaction ${hash} finalized successfully but has no deployment address, so it did not create a contract. The saved attempt is cleared; verify the site and network before starting a new deployment.`);
   }
-  const normalizedAddress = address.toLowerCase() as Address;
-  const deployedProtocol = await client.readContract({
+  // Keep GenLayer's checksummed deployment address. The RPC's contract reader
+  // currently treats an all-lowercase address as a different lookup key.
+  const normalizedAddress = address as Address;
+  const deployedProtocol = await readClient.readContract({
     address: normalizedAddress,
     functionName: 'get_protocol',
     args: [],
@@ -188,10 +257,11 @@ export async function deploySkillForge(
   });
   const protocol = deployedProtocol as { protocol?: unknown; owner?: unknown };
   if (protocol.protocol !== 'skillforge-v1' || String(protocol.owner).toLowerCase() !== account) {
-    throw new Error(`The deployed contract did not match SkillForge v1 or the connected owner. Transaction: ${String(hash)}`);
+    throw new Error(`The deployment at ${normalizedAddress} did not match SkillForge v1 or the connected owner. The transaction is saved and must be reviewed before another deployment. Transaction: ${hash}`);
   }
   window.localStorage.setItem(DEPLOYMENT_STORAGE_KEY, normalizedAddress);
-  return { hash: String(hash), address: normalizedAddress };
+  clearPendingDeployment();
+  return { hash, address: normalizedAddress };
 }
 
 export const shortAddress = (address: string) =>

@@ -25,11 +25,13 @@ import {
   connect,
   deploySkillForge,
   getDeploymentAddress,
+  getPendingDeployment,
   hasDeployment,
   provider,
   readContract,
   shortAddress,
   switchToStudionet,
+  resumeSkillForgeDeployment,
   walletState,
   writeContract,
   type Address,
@@ -219,6 +221,20 @@ function Studio({ account, chainId, owner, challenges, preview, onConnect, onRef
     finally { setBusy(false); }
   }
 
+  async function checkPreviousDeployment() {
+    if (!account) return onConnect();
+    if (chainId !== CHAIN_ID) {
+      try { await switchToStudionet(); } catch (error) { onError(error instanceof Error ? error.message : 'Could not switch to Studionet.'); }
+      return;
+    }
+    setBusy(true); setMessage('Checking the saved deployment transaction on Studionet. No transaction will be sent…');
+    try {
+      const deployed = await resumeSkillForgeDeployment(account, (progress) => setMessage(`Saved deployment ${progress.status.toLowerCase()}… no new transaction will be sent.`));
+      setMessage(`SkillForge deployed at ${deployed.address}. You are its owner.`); onDeployed();
+    } catch (error) { const text = error instanceof Error ? error.message : 'Could not verify the saved deployment.'; setMessage(text); onError(text); }
+    finally { setBusy(false); }
+  }
+
   async function createAndPublish() {
     if (!account || !isOwner || !challengeConsent || !form.id || !form.title || !form.category || !form.brief || form.criteria.some((item) => !item.trim())) return;
     setBusy(true); setMessage('Confirm challenge creation in your wallet…');
@@ -242,7 +258,10 @@ function Studio({ account, chainId, owner, challenges, preview, onConnect, onRef
 
   return <main className="subpage">
     <span className="kicker">Curated challenge publishing</span><h1>Creator studio</h1>
-    {preview ? <div className="deploy-panel"><div><h2>Deploy SkillForge to Studionet</h2><p>The connected wallet becomes the contract owner. Confirm the deployment in your wallet; the contract accepts no funds.</p></div><button className="primary" disabled={busy} onClick={() => void deploy()}><Flame size={18} />{busy ? 'Waiting for validators…' : chainId !== null && chainId !== CHAIN_ID ? 'Switch to Studionet' : 'Deploy SkillForge'}</button></div> : <>
+    {preview ? (() => {
+      const pending = getPendingDeployment();
+      return <div className="deploy-panel"><div><h2>{pending ? 'Check the saved deployment' : 'Deploy SkillForge to Studionet'}</h2><p>{pending ? <>A transaction is already recorded for this wallet. Check it before sending anything else. <a href={`https://explorer-studio.genlayer.com/tx/${pending.hash}`} target="_blank" rel="noreferrer">View transaction {shortAddress(pending.hash)}</a></> : 'The connected wallet becomes the contract owner. Confirm the deployment in your wallet; the contract accepts no funds.'}</p></div><button className="primary" disabled={busy || !account} onClick={() => void (pending ? checkPreviousDeployment() : deploy())}><Flame size={18} />{busy ? 'Checking Studionet…' : chainId !== null && chainId !== CHAIN_ID ? 'Switch to Studionet' : pending ? 'Check previous deployment' : 'Deploy SkillForge'}</button></div>;
+    })() : <>
       <div className="studio-intro"><div><h2>Turn a real task into public proof.</h2><p>SkillForge locks the brief, four criteria, pass mark and attempt limit before a challenge opens.</p>{owner && <small>Contract owner: {shortAddress(owner)} · Connected wallet: {account ? shortAddress(account) : 'not connected'}</small>}</div>{!account && <button className="secondary" onClick={onConnect}><Wallet size={17} /> Connect wallet</button>}</div>
       {isOwner && <section className="creator-form"><h2><Plus size={19} /> Create and publish a challenge</h2><p>Creation and publishing are separate finalized wallet transactions.</p><div className="form-grid"><label>Challenge ID<input value={form.id} maxLength={64} onChange={(event) => setForm({ ...form, id: event.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') })} placeholder="customer-support-v1" /></label><label>Title<input value={form.title} maxLength={100} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label><label>Category<input value={form.category} maxLength={40} onChange={(event) => setForm({ ...form, category: event.target.value })} /></label><label>Pass mark<input type="number" min="50" max="95" step="1" value={form.passMark} onChange={(event) => setForm({ ...form, passMark: event.target.value })} /></label><label>Attempts per wallet<input type="number" min="1" max="10" step="1" value={form.maxAttempts} onChange={(event) => setForm({ ...form, maxAttempts: event.target.value })} /></label></div><label className="form-label">Brief<textarea value={form.brief} maxLength={1800} onChange={(event) => setForm({ ...form, brief: event.target.value })} /></label><div className="criteria-editor"><b>Four published criteria</b>{form.criteria.map((criterion, index) => <label key={index}>Criterion {index + 1}<input value={criterion} maxLength={400} onChange={(event) => setForm({ ...form, criteria: form.criteria.map((item, criterionIndex) => criterionIndex === index ? event.target.value : item) })} /></label>)}</div><label className="consent"><input type="checkbox" checked={challengeConsent} onChange={(event) => setChallengeConsent(event.target.checked)} /><span><b>I understand challenge details are public.</b><small>Confirm this brief and rubric are safe to store permanently on-chain.</small></span></label><button className="primary" disabled={busy || !challengeConsent || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(form.id) || !form.title.trim() || !form.category.trim() || !form.brief.trim() || new TextEncoder().encode(form.title.trim()).length > 100 || new TextEncoder().encode(form.category.trim()).length > 40 || new TextEncoder().encode(form.brief.trim()).length > 1800 || form.criteria.some((item) => !item.trim() || new TextEncoder().encode(item.trim()).length > 400) || !Number.isInteger(Number(form.passMark)) || Number(form.passMark) < 50 || Number(form.passMark) > 95 || !Number.isInteger(Number(form.maxAttempts)) || Number(form.maxAttempts) < 1 || Number(form.maxAttempts) > 10} onClick={() => void createAndPublish()}>{busy ? 'Waiting for validators…' : 'Create & publish'} <ArrowRight size={18} /></button></section>}
       {account && !isOwner && <p className="notice" role="status">Only the deploying wallet can create or close challenges. Connect the owner wallet {owner ? shortAddress(owner) : ''}.</p>}
