@@ -51,7 +51,12 @@ def test_deploy_create_publish_and_close():
     )
     assert tx_execution_succeeded(deploy_receipt), deploy_receipt
     address = extract_contract_address(deploy_receipt)
-    schema = get_gl_client().get_contract_schema(address)
+    # Local Simulator's deployed-contract schema endpoint currently returns an
+    # empty method table; derive the ABI from the exact source used to deploy.
+    schema = get_gl_client().get_contract_schema_for_code(
+        contract_code=factory.contract_code
+    )
+    assert schema.get("methods"), schema
     contract = Contract.new(address, schema, account=owner)
 
     protocol = contract_method(contract, schema, "get_protocol")().call()
