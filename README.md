@@ -9,7 +9,7 @@ SkillForge v1 is deployed to stable GenLayer Studionet and the public Vercel app
 - wallet-first React interface with Explore, challenge workspace, My Proof, and Creator Studio;
 - pinned GenVM contract with locked challenge definitions, public-data consent, retry limits, idempotent requests, structured scorecards, and credential issuance;
 - no escrow or contract payment—every write rejects native value;
-- 23 direct contract tests, 4 UI tests, a three-validator lifecycle test, GenVM lint, TypeScript checks, and production build in the Ubuntu workflow;
+- 23 direct contract tests, 9 frontend tests, a three-validator lifecycle test, GenVM lint, TypeScript checks, and production build in the Ubuntu workflow;
 - responsive layout verified at desktop and 390px mobile width.
 
 The checked-in deployment manifest records the verified Studionet contract and source SHA-256. Visitors can load the same deployment without relying on the deploying wallet's browser storage. The owner wallet can create and publish challenges; learner wallets can submit only to open on-chain challenges.
@@ -50,4 +50,4 @@ The direct tests mock model output and cover deterministic state transitions. Th
 
 ## Verification status
 
-The GitHub Actions workflow runs the pinned GenVM lint, complete direct contract suite, three-validator local lifecycle test, frontend tests, and production build on Ubuntu 24.04. Keep the latest workflow green before presenting a release. Wallet acceptance/rejection and challenge execution evidence should be linked from the release notes or contribution materials.
+The GitHub Actions workflow runs the pinned GenVM lint, complete direct contract suite, three-validator local lifecycle test, frontend tests, and production build on Ubuntu 24.04. Keep the latest workflow green before presenting a release. [Review evidence](REVIEW-EVIDENCE.md) links the immutable source, CI run, and finalized live wallet cases while stating the scenarios that are not yet live-proven.
