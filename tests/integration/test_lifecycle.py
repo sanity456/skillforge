@@ -7,15 +7,36 @@ from gltest.assertions import tx_execution_succeeded
 from gltest.contracts import Contract
 from gltest.utils import extract_contract_address
 
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skipif(
-        os.getenv("RUN_SKILLFORGE_INTEGRATION") != "1",
-        reason="Set RUN_SKILLFORGE_INTEGRATION=1 with local GenLayer Studio running",
-    ),
-]
+def contract_method(contract, schema, python_name):
+    """Resolve a Python contract method through the SDK-generated schema name."""
+    expected = python_name.replace("_", "").lower()
+    method_names = schema.get("methods", {})
+    matches = [name for name in method_names if name.replace("_", "").lower() == expected]
+    if len(matches) != 1:
+        raise AssertionError(
+            f"Expected one schema method matching {python_name!r}; "
+            f"found {matches!r} among {list(method_names)!r}"
+        )
+    return getattr(contract, matches[0])
 
 
+@pytest.mark.parametrize("schema_name", ["get_protocol", "getProtocol"])
+def test_contract_method_resolves_generated_names(schema_name):
+    class FakeContract:
+        pass
+
+    expected = object()
+    setattr(FakeContract, schema_name, expected)
+    schema = {"methods": {schema_name: {"readonly": True}}}
+
+    assert contract_method(FakeContract(), schema, "get_protocol") is expected
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    os.getenv("RUN_SKILLFORGE_INTEGRATION") != "1",
+    reason="Set RUN_SKILLFORGE_INTEGRATION=1 with local GenLayer Studio running",
+)
 def test_deploy_create_publish_and_close():
     from gltest_cli.config.general import get_general_config
 
@@ -33,13 +54,13 @@ def test_deploy_create_publish_and_close():
     schema = get_gl_client().get_contract_schema(address)
     contract = Contract.new(address, schema, account=owner)
 
-    protocol = contract.get_protocol().call()
+    protocol = contract_method(contract, schema, "get_protocol")().call()
     assert protocol["protocol"] == "skillforge-v1"
     assert protocol["owner"].lower() == owner.address.lower()
     assert protocol["funds_accepted"] is False
 
     challenge_id = "consensus-smoke-" + owner.address[-8:].lower()
-    create_receipt = contract.create_challenge(
+    create_receipt = contract_method(contract, schema, "create_challenge")(
         args=[
             challenge_id,
             "Consensus smoke challenge",
@@ -55,17 +76,23 @@ def test_deploy_create_publish_and_close():
         ]
     ).transact(consensus_max_rotations=5)
     assert tx_execution_succeeded(create_receipt), create_receipt
-    assert contract.get_challenge(args=[challenge_id]).call()["status"] == "DRAFT"
+    get_challenge = contract_method(contract, schema, "get_challenge")
+    assert get_challenge(args=[challenge_id]).call()["status"] == "DRAFT"
 
-    publish_receipt = contract.publish_challenge(args=[challenge_id]).transact(consensus_max_rotations=5)
+    publish_receipt = contract_method(contract, schema, "publish_challenge")(
+        args=[challenge_id]
+    ).transact(consensus_max_rotations=5)
     assert tx_execution_succeeded(publish_receipt), publish_receipt
-    assert contract.get_challenge(args=[challenge_id]).call()["status"] == "OPEN"
+    assert get_challenge(args=[challenge_id]).call()["status"] == "OPEN"
 
     learner_contract = contract.connect(learner)
-    denied_receipt = learner_contract.close_challenge(args=[challenge_id]).transact(consensus_max_rotations=5)
+    close_challenge = contract_method(learner_contract, schema, "close_challenge")
+    denied_receipt = close_challenge(args=[challenge_id]).transact(consensus_max_rotations=5)
     assert not tx_execution_succeeded(denied_receipt)
-    assert contract.get_challenge(args=[challenge_id]).call()["status"] == "OPEN"
+    assert get_challenge(args=[challenge_id]).call()["status"] == "OPEN"
 
-    close_receipt = contract.close_challenge(args=[challenge_id]).transact(consensus_max_rotations=5)
+    close_receipt = contract_method(contract, schema, "close_challenge")(
+        args=[challenge_id]
+    ).transact(consensus_max_rotations=5)
     assert tx_execution_succeeded(close_receipt), close_receipt
-    assert contract.get_challenge(args=[challenge_id]).call()["status"] == "CLOSED"
+    assert get_challenge(args=[challenge_id]).call()["status"] == "CLOSED"

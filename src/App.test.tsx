@@ -30,9 +30,9 @@ describe('SkillForge shell', () => {
     expect(page.queryByRole('button', { name: /all challenges/i })).toBeNull();
   });
 
-  it('labels catalog examples as previews until deployment exists', () => {
+  it('uses the verified deployment manifest for live challenge mode', () => {
     const page = render(<App />);
-    expect(page.getByText(/preview challenges/i)).toBeTruthy();
-    expect(page.getByText(/become active after skillforge is deployed/i)).toBeTruthy();
+    expect(page.getByText(/on-chain challenges/i)).toBeTruthy();
+    expect(page.getByText(/loaded from the deployed contract/i)).toBeTruthy();
   });
 });

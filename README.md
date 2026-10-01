@@ -4,15 +4,20 @@ SkillForge turns practical work into public, validator-verified achievement reco
 
 ## Current checkpoint
 
-The v1 foundation is implemented locally:
+SkillForge v1 is deployed to stable GenLayer Studionet and the public Vercel app is live:
 
 - wallet-first React interface with Explore, challenge workspace, My Proof, and Creator Studio;
 - pinned GenVM contract with locked challenge definitions, public-data consent, retry limits, idempotent requests, structured scorecards, and credential issuance;
 - no escrow or contract payment—every write rejects native value;
-- 22 direct contract tests, 4 UI tests, a three-validator lifecycle test in clean Ubuntu CI, GenVM lint, TypeScript checks, and production build;
+- 23 direct contract tests, 4 UI tests, a three-validator lifecycle test, GenVM lint, TypeScript checks, and production build in the Ubuntu workflow;
 - responsive layout verified at desktop and 390px mobile width.
 
-The UI starts in preview mode because no contract is deployed. Use Creator Studio with the owner wallet to deploy the pinned contract to Studionet. After the final receipt and protocol/owner checks pass, the deployment address is saved in that browser's local storage; the owner can then create and publish a challenge. Learner wallets can submit only to open on-chain challenges.
+The checked-in deployment manifest records the verified Studionet contract and source SHA-256. Visitors can load the same deployment without relying on the deploying wallet's browser storage. The owner wallet can create and publish challenges; learner wallets can submit only to open on-chain challenges.
+
+- Contract: `0x2C9BFBCE8d68C7098e719cE23e49a9fe05a1d2Ae`
+- Network: GenLayer Studionet, chain ID `61999`
+- Contract source SHA-256: `8fc37a87dab92d7ce0d14626cd61d9e767e3915a8f12f71657441af306c067a1`
+- Public app: https://skillforge-blond-psi.vercel.app
 
 ## Product boundary
 
@@ -43,11 +48,6 @@ npm run build
 
 The direct tests mock model output and cover deterministic state transitions. The Linux CI run also starts a local three-validator simulator and exercises deployment, challenge creation/publication, owner-only closure, and the closed state. A live validator-scoring transaction still requires the connected learner wallet on Studionet.
 
-## Next activation milestone
+## Verification status
 
-1. Add callback-level validator tests and a small full-consensus suite.
-2. Deploy the pinned contract to Studionet from the owner wallet.
-3. Verify deployed source SHA-256 against this repository.
-4. Create and publish the three catalog challenges on-chain.
-5. Record a human-wallet pass and fail path, then configure the verified deployment manifest.
-6. Publish a separate public preview only after the wallet evidence passes.
+The GitHub Actions workflow runs the pinned GenVM lint, complete direct contract suite, three-validator local lifecycle test, frontend tests, and production build on Ubuntu 24.04. Keep the latest workflow green before presenting a release. Wallet acceptance/rejection and challenge execution evidence should be linked from the release notes or contribution materials.
