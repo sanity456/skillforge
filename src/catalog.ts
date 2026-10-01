@@ -10,7 +10,7 @@ export type Challenge = {
   status: 'DRAFT' | 'OPEN' | 'CLOSED';
   rubric_hash?: string;
   creator?: string;
-  difficulty: 'Starter' | 'Intermediate' | 'Advanced';
+  difficulty: 'Starter' | 'Intermediate' | 'Advanced' | 'Unrated';
   time: string;
   accent: string;
   mark: string;

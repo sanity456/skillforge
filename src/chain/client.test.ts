@@ -10,9 +10,9 @@ afterEach(() => {
 });
 
 describe('Studionet deployment storage', () => {
-  it('preserves the checksummed contract address for RPC reads', () => {
+  it('uses the reviewed manifest even when browser storage contains another address', () => {
     const checksumAddress = '0x2C9BFBCE8d68C7098e719cE23e49a9fe05a1d2Ae';
-    window.localStorage.setItem(deploymentKey, checksumAddress);
+    window.localStorage.setItem(deploymentKey, '0x1111111111111111111111111111111111111111');
 
     expect(getDeploymentAddress()).toBe(checksumAddress);
   });

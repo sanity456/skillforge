@@ -44,14 +44,17 @@ function clearPendingDeployment() {
 }
 
 export function getDeploymentAddress(): Address | null {
+  // A published build must use its reviewed deployment, regardless of a visitor's
+  // older browser storage. Local storage is only for builds without a manifest.
+  const configuredAddress: unknown = deployment.address;
+  if (typeof configuredAddress === 'string' && /^0x[0-9a-f]{40}$/i.test(configuredAddress)) {
+    return configuredAddress as Address;
+  }
   if (typeof window !== 'undefined') {
     const saved = window.localStorage.getItem(DEPLOYMENT_STORAGE_KEY);
     if (saved && /^0x[0-9a-f]{40}$/i.test(saved)) return saved as Address;
   }
-  const configuredAddress: unknown = deployment.address;
-  return typeof configuredAddress === 'string' && /^0x[0-9a-f]{40}$/i.test(configuredAddress)
-    ? configuredAddress as Address
-    : null;
+  return null;
 }
 
 export function hasDeployment() {

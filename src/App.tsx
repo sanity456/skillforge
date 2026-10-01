@@ -62,7 +62,7 @@ function Logo() {
   );
 }
 
-function fromChain(value: unknown): Challenge[] {
+export function fromChain(value: unknown): Challenge[] {
   if (!Array.isArray(value)) throw new Error('The contract returned an invalid challenge list.');
   return value.map((entry, index) => {
     if (!entry || typeof entry !== 'object') throw new Error('The contract returned an invalid challenge.');
@@ -71,9 +71,8 @@ function fromChain(value: unknown): Challenge[] {
     const criteria = Array.isArray(raw.criteria) ? raw.criteria.filter((item): item is string => typeof item === 'string') : [];
     if (!raw.id || !raw.title || !raw.brief || criteria.length !== 4) throw new Error('A published challenge is missing required fields.');
     return {
-      ...(sample ?? starterChallenges[0]),
-      ...raw,
       id: raw.id,
+      version: Number(raw.version) || 1,
       title: raw.title,
       category: raw.category ?? 'General',
       brief: raw.brief,
@@ -81,6 +80,10 @@ function fromChain(value: unknown): Challenge[] {
       pass_mark: Number(raw.pass_mark),
       max_attempts: Number(raw.max_attempts),
       status: raw.status ?? 'DRAFT',
+      rubric_hash: raw.rubric_hash,
+      creator: raw.creator,
+      difficulty: sample?.difficulty ?? 'Unrated',
+      time: sample?.time ?? 'No time limit',
       accent: sample?.accent ?? ['#b7f36b', '#ff8f5c', '#8d7cff'][index % 3],
       mark: sample?.mark ?? String(index + 1).padStart(2, '0'),
     };
@@ -99,9 +102,9 @@ function ChallengeCard({ challenge, onOpen }: { challenge: Challenge; onOpen: ()
   );
 }
 
-function Explore({ challenges, preview, loading, onSelect, onSetup }: {
-  challenges: Challenge[]; preview: boolean; loading: boolean;
-  onSelect: (challenge: Challenge) => void; onSetup: () => void;
+function Explore({ challenges, preview, loading, error, onSelect, onSetup, onRetry }: {
+  challenges: Challenge[]; preview: boolean; loading: boolean; error: string;
+  onSelect: (challenge: Challenge) => void; onSetup: () => void; onRetry: () => void;
 }) {
   const openChallenges = challenges.filter((challenge) => challenge.status === 'OPEN');
   return <>
@@ -111,7 +114,7 @@ function Explore({ challenges, preview, loading, onSelect, onSetup }: {
       <p className="hero-copy">Complete real-world challenges. Get evaluated by independent validators. Carry the proof in your wallet.</p>
       <div className="hero-actions">
         {openChallenges[0] && <button className="primary" onClick={() => onSelect(openChallenges[0])}>Take your first challenge <ArrowRight size={18} /></button>}
-        {!openChallenges.length && !preview && !loading && <button className="primary" onClick={onSetup}>Set up a challenge <ArrowRight size={18} /></button>}
+        {!openChallenges.length && !preview && !loading && !error && <button className="primary" onClick={onSetup}>Set up a challenge <ArrowRight size={18} /></button>}
         <a href="#how-it-works" className="text-link">See how it works</a>
       </div>
       <div className="hero-proof" aria-label="Product principles"><span><ShieldCheck size={18} /> Validator checked</span><span><LockKeyhole size={18} /> Rubric locked</span><span><Wallet size={18} /> Wallet owned</span></div>
@@ -119,7 +122,7 @@ function Explore({ challenges, preview, loading, onSelect, onSetup }: {
     </section>
     <section className="challenge-section" id="challenges">
       <div className="section-heading"><div><span className="kicker">{preview ? 'Preview challenges' : 'On-chain challenges'}</span><h2>{preview ? 'Explore the challenge format' : 'Choose what you want to prove'}</h2></div><p>{preview ? 'These examples become active after SkillForge is deployed and an owner publishes them.' : 'Challenge details and rubrics are loaded from the deployed contract.'}</p></div>
-      {loading ? <p className="notice" role="status">Loading challenges from GenLayer…</p> : openChallenges.length ? <div className="challenge-grid">{openChallenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} onOpen={() => onSelect(challenge)} />)}</div> : <div className="empty small"><BookOpen size={32} /><h2>No open challenges</h2><p>{preview ? 'Deploy SkillForge, then publish a challenge from Creator Studio.' : 'The owner has not published an open challenge yet.'}</p>{preview && <button className="primary" onClick={onSetup}>Open Creator Studio</button>}</div>}
+      {loading ? <p className="notice" role="status">Loading challenges from GenLayer…</p> : error ? <div className="empty small" role="alert"><BookOpen size={32} /><h2>Challenges unavailable</h2><p>{error}</p><button className="primary" onClick={onRetry}>Try again</button></div> : openChallenges.length ? <div className="challenge-grid">{openChallenges.map((challenge) => <ChallengeCard key={challenge.id} challenge={challenge} onOpen={() => onSelect(challenge)} />)}</div> : <div className="empty small"><BookOpen size={32} /><h2>No open challenges</h2><p>{preview ? 'Deploy SkillForge, then publish a challenge from Creator Studio.' : 'The owner has not published an open challenge yet.'}</p>{preview && <button className="primary" onClick={onSetup}>Open Creator Studio</button>}</div>}
     </section>
     <section className="how" id="how-it-works"><div className="how-copy"><span className="kicker">The forge</span><h2>Skill becomes evidence in three clear steps.</h2></div><ol><li><span>1</span><div><b>Take the brief</b><p>Read the public task, rubric and passing threshold.</p></div></li><li><span>2</span><div><b>Show your work</b><p>Submit from your wallet with clear public-data consent.</p></div></li><li><span>3</span><div><b>Earn the proof</b><p>Independent validators agree before a credential is issued.</p></div></li></ol></section>
   </>;
@@ -184,21 +187,30 @@ async function digest(value: string) {
   return Array.from(new Uint8Array(bytes), (item) => item.toString(16).padStart(2, '0')).join('');
 }
 
-function Profile({ account, profile, loading, error, onConnect }: { account: Address | null; profile: ProfileData | null; loading: boolean; error: string; onConnect: () => void }) {
+export function Profile({ account, profile, challenges, loading, error, onConnect }: { account: Address | null; profile: ProfileData | null; challenges: Challenge[]; loading: boolean; error: string; onConnect: () => void }) {
   if (!account) return <main className="subpage"><span className="kicker">Wallet-owned progress</span><h1>My proof</h1><div className="empty"><div className="empty-icon"><UserRound size={34} /></div><h2>Your work deserves a home.</h2><p>Connect the wallet you use for challenges to see earned credentials and attempts.</p><button className="primary" onClick={onConnect}><Wallet size={18} /> Connect wallet</button></div></main>;
   const credentials = profile?.credentials ?? [];
   const submissions = profile?.submissions ?? [];
+  const contractAddress = getDeploymentAddress();
   return <main className="subpage"><span className="kicker">Wallet-owned progress</span><h1>My proof</h1><section className="profile-card"><div className="avatar"><Hammer /></div><span>Connected learner</span><h2>{shortAddress(account)}</h2><p>Challenge attempts and credentials recorded for this wallet.</p></section>
     <section className="activity-panel"><div className="section-heading"><div><span className="kicker">Earned on GenLayer</span><h2>Credentials</h2></div></div>{loading ? <p role="status">Loading your profile…</p> : error ? <p className="notice" role="alert">{error}</p> : credentials.length ? <div className="credential-grid">{credentials.map((item, index) => <article className="credential-card" key={String(item.id ?? index)}><Award size={23} /><span>{String(item.category ?? 'SkillForge')}</span><h3>{String(item.title ?? item.challenge_id)}</h3><p>{String(item.score ?? 0)}/100 · {String(item.challenge_version ?? 'v1')}</p><code>{String(item.rubric_hash ?? '').slice(0, 16)}…</code></article>)}</div> : <p>No credentials yet. Pass an open challenge to earn your first record.</p>}</section>
-    <section className="activity-panel"><div className="section-heading"><div><span className="kicker">Public record</span><h2>Submission history</h2></div></div>{loading ? <p>Loading submissions…</p> : submissions.length ? <div className="submission-list">{[...submissions].reverse().map((item, index) => { const assessment = item.assessment as Record<string, unknown> | undefined; return <article className="submission-row" key={String(item.id ?? index)}><div><b>{String(item.title ?? item.challenge_id)}</b><small>Attempt {String(item.attempt)} · {String(item.recorded_at)}</small></div><span>{String(assessment?.total ?? '—')}/100</span><strong className={item.verdict === 'CREDENTIAL_EARNED' ? 'success' : 'muted'}>{String(item.verdict).replaceAll('_', ' ')}</strong><small>{String(item.reason_code).replaceAll('_', ' ')}</small></article>; })}</div> : <p>No submissions yet.</p>}</section>
+    <section className="activity-panel"><div className="section-heading"><div><span className="kicker">Public record</span><h2>Submission history</h2></div></div>{loading ? <p role="status">Loading submissions…</p> : error ? <p>Submission history could not be loaded.</p> : submissions.length ? <div className="submission-list">{[...submissions].reverse().map((item, index) => {
+      const assessment = item.assessment as Record<string, unknown> | undefined;
+      const scores = assessment?.scores && typeof assessment.scores === 'object' ? assessment.scores as Record<string, unknown> : {};
+      const challenge = challenges.find((entry) => entry.id === item.challenge_id);
+      return <article className="submission-row" key={String(item.id ?? index)}>
+        <div className="submission-summary"><div><b>{String(item.title ?? item.challenge_id)}</b><small>Attempt {String(item.attempt)} · {String(item.recorded_at)}</small></div><span>{String(assessment?.total ?? '—')}/100</span><strong className={item.verdict === 'CREDENTIAL_EARNED' ? 'success' : 'muted'}>{String(item.verdict).replaceAll('_', ' ')}</strong><small>{String(item.reason_code).replaceAll('_', ' ')}</small></div>
+        <details className="scorecard"><summary>View full scorecard</summary><div className="scorecard-content"><div className="criterion-scores">{[1, 2, 3, 4].map((number) => <div key={number}><span>{challenge?.criteria[number - 1] ?? `Criterion ${number}`}</span><b>{String(scores[`criterion_${number}`] ?? '—')}/25</b></div>)}</div><p><b>Assessment:</b> {String(assessment?.summary ?? 'Not available')}</p><p><b>Strength:</b> {String(assessment?.strength ?? 'Not available')}</p><p><b>Improve next:</b> {String(assessment?.improvement ?? 'Not available')}</p><div className="proof-identifiers"><span>Submission ID <code>{String(item.id ?? '')}</code></span><span>Rubric hash <code>{String(item.rubric_hash ?? '')}</code></span><span>Work hash <code>{String(item.work_hash ?? '')}</code></span>{contractAddress && <span>Contract <code>{contractAddress}</code></span>}</div></div></details>
+      </article>;
+    })}</div> : <p>No submissions yet.</p>}</section>
   </main>;
 }
 
 type ChallengeForm = { id: string; title: string; category: string; brief: string; criteria: string[]; passMark: string; maxAttempts: string };
 const emptyForm = (): ChallengeForm => ({ id: '', title: '', category: '', brief: '', criteria: ['', '', '', ''], passMark: '70', maxAttempts: '3' });
 
-function Studio({ account, chainId, owner, challenges, preview, onConnect, onRefresh, onDeployed, onError }: {
-  account: Address | null; chainId: number | null; owner: string | null; challenges: Challenge[]; preview: boolean;
+function Studio({ account, chainId, owner, challenges, preview, loading, loadError, onConnect, onRefresh, onDeployed, onError }: {
+  account: Address | null; chainId: number | null; owner: string | null; challenges: Challenge[]; preview: boolean; loading: boolean; loadError: string;
   onConnect: () => void; onRefresh: () => Promise<void>; onDeployed: () => void; onError: (message: string) => void;
 }) {
   const [form, setForm] = useState<ChallengeForm>(emptyForm);
@@ -264,8 +276,8 @@ function Studio({ account, chainId, owner, challenges, preview, onConnect, onRef
     })() : <>
       <div className="studio-intro"><div><h2>Turn a real task into public proof.</h2><p>SkillForge locks the brief, four criteria, pass mark and attempt limit before a challenge opens.</p>{owner && <small>Contract owner: {shortAddress(owner)} · Connected wallet: {account ? shortAddress(account) : 'not connected'}</small>}</div>{!account && <button className="secondary" onClick={onConnect}><Wallet size={17} /> Connect wallet</button>}</div>
       {isOwner && <section className="creator-form"><h2><Plus size={19} /> Create and publish a challenge</h2><p>Creation and publishing are separate finalized wallet transactions.</p><div className="form-grid"><label>Challenge ID<input value={form.id} maxLength={64} onChange={(event) => setForm({ ...form, id: event.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') })} placeholder="customer-support-v1" /></label><label>Title<input value={form.title} maxLength={100} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label><label>Category<input value={form.category} maxLength={40} onChange={(event) => setForm({ ...form, category: event.target.value })} /></label><label>Pass mark<input type="number" min="50" max="95" step="1" value={form.passMark} onChange={(event) => setForm({ ...form, passMark: event.target.value })} /></label><label>Attempts per wallet<input type="number" min="1" max="10" step="1" value={form.maxAttempts} onChange={(event) => setForm({ ...form, maxAttempts: event.target.value })} /></label></div><label className="form-label">Brief<textarea value={form.brief} maxLength={1800} onChange={(event) => setForm({ ...form, brief: event.target.value })} /></label><div className="criteria-editor"><b>Four published criteria</b>{form.criteria.map((criterion, index) => <label key={index}>Criterion {index + 1}<input value={criterion} maxLength={400} onChange={(event) => setForm({ ...form, criteria: form.criteria.map((item, criterionIndex) => criterionIndex === index ? event.target.value : item) })} /></label>)}</div><label className="consent"><input type="checkbox" checked={challengeConsent} onChange={(event) => setChallengeConsent(event.target.checked)} /><span><b>I understand challenge details are public.</b><small>Confirm this brief and rubric are safe to store permanently on-chain.</small></span></label><button className="primary" disabled={busy || !challengeConsent || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(form.id) || !form.title.trim() || !form.category.trim() || !form.brief.trim() || new TextEncoder().encode(form.title.trim()).length > 100 || new TextEncoder().encode(form.category.trim()).length > 40 || new TextEncoder().encode(form.brief.trim()).length > 1800 || form.criteria.some((item) => !item.trim() || new TextEncoder().encode(item.trim()).length > 400) || !Number.isInteger(Number(form.passMark)) || Number(form.passMark) < 50 || Number(form.passMark) > 95 || !Number.isInteger(Number(form.maxAttempts)) || Number(form.maxAttempts) < 1 || Number(form.maxAttempts) > 10} onClick={() => void createAndPublish()}>{busy ? 'Waiting for validators…' : 'Create & publish'} <ArrowRight size={18} /></button></section>}
-      {account && !isOwner && <p className="notice" role="status">Only the deploying wallet can create or close challenges. Connect the owner wallet {owner ? shortAddress(owner) : ''}.</p>}
-      <section className="studio-challenges"><h2>Challenges on this contract</h2>{challenges.length ? challenges.map((challenge) => <article className="studio-challenge" key={challenge.id}><div><b>{challenge.title}</b><small>{challenge.id} · {challenge.category} · {challenge.pass_mark}/100 · {challenge.max_attempts} attempts</small></div><span className={`challenge-status ${challenge.status.toLowerCase()}`}>{challenge.status}</span>{challenge.status === 'DRAFT' && isOwner && <button className="secondary" disabled={busy} onClick={() => void writeContract(account!, 'publish_challenge', [challenge.id], (progress) => setMessage(`Publishing ${progress.status.toLowerCase()}…`)).then(onRefresh).catch((error) => onError(error instanceof Error ? error.message : 'Publish failed.'))}>Publish</button>}{challenge.status === 'OPEN' && isOwner && <button className="secondary" disabled={busy} onClick={() => void closeChallenge(challenge.id)}>Close</button>}</article>) : <p>No on-chain challenges yet.</p>}</section>
+      {account && !isOwner && !loading && !loadError && <p className="notice" role="status">Only the deploying wallet can create or close challenges. Connect the owner wallet {owner ? shortAddress(owner) : ''}.</p>}
+      <section className="studio-challenges"><h2>Challenges on this contract</h2>{loading ? <p role="status">Loading challenges from GenLayer…</p> : loadError ? <div role="alert"><p>{loadError}</p><button className="secondary" onClick={() => void onRefresh()}>Try again</button></div> : challenges.length ? challenges.map((challenge) => <article className="studio-challenge" key={challenge.id}><div><b>{challenge.title}</b><small>{challenge.id} · {challenge.category} · {challenge.pass_mark}/100 · {challenge.max_attempts} attempts</small></div><span className={`challenge-status ${challenge.status.toLowerCase()}`}>{challenge.status}</span>{challenge.status === 'DRAFT' && isOwner && <button className="secondary" disabled={busy} onClick={() => void writeContract(account!, 'publish_challenge', [challenge.id], (progress) => setMessage(`Publishing ${progress.status.toLowerCase()}…`)).then(onRefresh).catch((error) => onError(error instanceof Error ? error.message : 'Publish failed.'))}>Publish</button>}{challenge.status === 'OPEN' && isOwner && <button className="secondary" disabled={busy} onClick={() => void closeChallenge(challenge.id)}>Close</button>}</article>) : <p>No on-chain challenges yet.</p>}</section>
     </>}
     {message && <p className="notice" role="status">{message}</p>}
   </main>;
@@ -277,24 +289,30 @@ export function App() {
   const [account, setAccount] = useState<Address | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
   const [walletError, setWalletError] = useState('');
-  const [challenges, setChallenges] = useState<Challenge[]>(starterChallenges);
+  const [challenges, setChallenges] = useState<Challenge[]>(hasDeployment() ? [] : starterChallenges);
+  const [challengeError, setChallengeError] = useState('');
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [owner, setOwner] = useState<string | null>(null);
   const [preview, setPreview] = useState(!hasDeployment());
-  const [loadingChallenges, setLoadingChallenges] = useState(false);
+  const [loadingChallenges, setLoadingChallenges] = useState(hasDeployment());
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [deploymentVersion, setDeploymentVersion] = useState(0);
 
   const refreshChallenges = useCallback(async () => {
-    if (!hasDeployment()) { setPreview(true); setChallenges(starterChallenges); setOwner(null); return; }
-    setLoadingChallenges(true); setPreview(false);
+    if (!hasDeployment()) { setPreview(true); setChallenges(starterChallenges); setOwner(null); setChallengeError(''); setLoadingChallenges(false); return; }
+    setLoadingChallenges(true); setPreview(false); setChallengeError('');
     try {
       const [rawChallenges, rawProtocol] = await Promise.all([readContract('list_challenges'), readContract('get_protocol')]);
       const protocol = rawProtocol as ProtocolData;
       if (protocol.protocol !== 'skillforge-v1') throw new Error('The configured contract is not SkillForge v1.');
-      setOwner(String(protocol.owner).toLowerCase()); setChallenges(fromChain(rawChallenges));
-    } catch (error) { setWalletError(error instanceof Error ? error.message : 'Could not load the SkillForge contract.'); }
+      const nextChallenges = fromChain(rawChallenges);
+      setOwner(String(protocol.owner).toLowerCase()); setChallenges(nextChallenges);
+      setSelected((current) => current ? nextChallenges.find((challenge) => challenge.id === current.id) ?? null : null);
+    } catch (error) {
+      setChallengeError(error instanceof Error ? error.message : 'Could not load the SkillForge contract.');
+      setChallenges([]); setOwner(null); setSelected(null);
+    }
     finally { setLoadingChallenges(false); }
   }, [deploymentVersion]);
 
@@ -335,7 +353,7 @@ export function App() {
   return <div className="app-shell">
     <Header view={view} setView={navigate} walletLabel={walletLabel} chainId={chainId} connectWallet={connectWallet} />
     {walletError && <div className="error-banner" role="alert"><X size={16} /> {walletError}</div>}
-    {selected ? <ChallengeDetail challenge={selected} account={account} chainId={chainId} preview={preview} onBack={() => setSelected(null)} onConnect={() => void connectWallet()} onSetup={() => navigate('studio')} onError={setWalletError} onProgress={handleProgress} onProfileRefresh={() => void refreshProfile()} /> : view === 'explore' ? <Explore challenges={challenges} preview={preview} loading={loadingChallenges} onSelect={setSelected} onSetup={() => navigate('studio')} /> : view === 'profile' ? <Profile account={account} profile={profile} loading={loadingProfile} error={profileError} onConnect={() => void connectWallet()} /> : <Studio account={account} chainId={chainId} owner={owner} challenges={challenges} preview={!deployedNow} onConnect={() => void connectWallet()} onRefresh={refreshChallenges} onDeployed={onDeployed} onError={setWalletError} />}
+    {selected ? <ChallengeDetail challenge={selected} account={account} chainId={chainId} preview={preview} onBack={() => setSelected(null)} onConnect={() => void connectWallet()} onSetup={() => navigate('studio')} onError={setWalletError} onProgress={handleProgress} onProfileRefresh={() => void refreshProfile()} /> : view === 'explore' ? <Explore challenges={challenges} preview={preview} loading={loadingChallenges} error={challengeError} onSelect={setSelected} onSetup={() => navigate('studio')} onRetry={() => void refreshChallenges()} /> : view === 'profile' ? <Profile account={account} profile={profile} challenges={challenges} loading={loadingProfile} error={profileError} onConnect={() => void connectWallet()} /> : <Studio account={account} chainId={chainId} owner={owner} challenges={challenges} preview={!deployedNow} loading={loadingChallenges} loadError={challengeError} onConnect={() => void connectWallet()} onRefresh={refreshChallenges} onDeployed={onDeployed} onError={setWalletError} />}
     <footer><Logo /><p>Proof of work, shaped by consensus.</p><span>GenLayer Studionet · v1</span></footer>
   </div>;
 }
