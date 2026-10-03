@@ -14,6 +14,10 @@ SkillForge v1 is deployed to stable GenLayer Studionet and the public Vercel app
 
 The checked-in deployment manifest records the verified Studionet contract and source SHA-256. Visitors can load the same deployment without relying on the deploying wallet's browser storage. The owner wallet can create and publish challenges; learner wallets can submit only to open on-chain challenges.
 
+### Creating a challenge (reviewer walkthrough)
+
+Challenge creation is intentionally curated, not open to every wallet. On the [public app](https://skillforge-blond-psi.vercel.app/), select **Creator studio** in the top navigation. A signed-out visitor or non-owner wallet sees the owner-only explanation and the public owner address; the creation form appears only when the deployed contract owner wallet (`0x7Cef5DBbD598ba74EF9C665c9853E573448d97D0`) is connected on GenLayer Studionet. The owner fills in an ID, title, category, brief, four scoring criteria, pass mark, and attempt limit, acknowledges that the challenge details are public, then selects **Create & publish**. This requires two separate finalized wallet approvals: creation, then publication. It sends `0 GEN` contract value. Once published, the challenge appears in Explore and any wallet may submit work. No reviewer needs the owner wallet to inspect the UI or try an existing challenge.
+
 - Contract: `0x2C9BFBCE8d68C7098e719cE23e49a9fe05a1d2Ae`
 - Network: GenLayer Studionet, chain ID `61999`
 - Contract source SHA-256: `8fc37a87dab92d7ce0d14626cd61d9e767e3915a8f12f71657441af306c067a1`

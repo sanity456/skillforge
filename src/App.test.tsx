@@ -13,7 +13,7 @@ beforeEach(() => {
   vi.spyOn(chainClient, 'readContract').mockImplementation(readLiveContract);
 });
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); Reflect.deleteProperty(window, 'ethereum'); });
 
 describe('SkillForge shell', () => {
   it('opens a challenge and displays the locked rubric', async () => {
@@ -44,6 +44,31 @@ describe('SkillForge shell', () => {
     const page = render(<App />);
     expect(page.getByText(/on-chain challenges/i)).toBeTruthy();
     expect(page.getByText(/loaded from the deployed contract/i)).toBeTruthy();
+  });
+
+  it('explains owner-only challenge creation before a wallet connects', async () => {
+    const page = render(<App />);
+    await userEvent.click(page.getByRole('button', { name: /creator studio/i }));
+    expect(await page.findByRole('heading', { name: 'Who can create a challenge?' })).toBeTruthy();
+    expect(page.getByText(/only the wallet that deployed this contract can create, publish, or close challenges/i)).toBeTruthy();
+    expect(page.getByText(/connect the owner wallet to show the creation form/i)).toBeTruthy();
+    expect(page.queryByRole('heading', { name: 'Create and publish a challenge' })).toBeNull();
+  });
+
+  it('keeps the creation form hidden from a connected non-owner', async () => {
+    Object.defineProperty(window, 'ethereum', { configurable: true, value: { request: async ({ method }: { method: string }) => method === 'eth_accounts' ? ['0xAb99c741494bEF91FAE66144dda31Be93180baD4'] : '0xf22f' } });
+    const page = render(<App />);
+    await userEvent.click(page.getByRole('button', { name: /creator studio/i }));
+    expect(await page.findByText(/this connected wallet is not the owner/i)).toBeTruthy();
+    expect(page.queryByRole('heading', { name: 'Create and publish a challenge' })).toBeNull();
+  });
+
+  it('shows the creation form to the deployed contract owner', async () => {
+    Object.defineProperty(window, 'ethereum', { configurable: true, value: { request: async ({ method }: { method: string }) => method === 'eth_accounts' ? ['0x7Cef5DBbD598ba74EF9C665c9853E573448d97D0'] : '0xf22f' } });
+    const page = render(<App />);
+    await userEvent.click(page.getByRole('button', { name: /creator studio/i }));
+    expect(await page.findByRole('heading', { name: 'Create and publish a challenge' })).toBeTruthy();
+    expect(page.queryByRole('heading', { name: 'Who can create a challenge?' })).toBeNull();
   });
 
   it('hides unverified starter cards on RPC failure and recovers on retry', async () => {
